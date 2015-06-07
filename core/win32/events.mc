@@ -56,8 +56,8 @@ SeverityNames=(
 
 ;// FIXME: unclear on can we override these..
 FacilityNames=(
-    DRCore     =0x0FF   ; core messages
-    Security   =0x7FF   ; security violations
+    DRCore     =0x0FF
+    Security   =0x7FF
 )
 
 ;// default
@@ -399,7 +399,7 @@ A security violation was intercepted in application %1!s! (%2!s!).
 Threat ID: %3!s!.
 .
 
-MessageID =
+MessageId =
 Severity = Error
 Facility = DRCore
 SymbolicName = MSG_HOT_PATCH_FAILURE

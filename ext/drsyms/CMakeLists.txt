@@ -52,42 +52,45 @@ endif()
 # we need libc b/c our elftoolchain libraries use it
 set(DynamoRIO_USE_LIBC ON)
 
-# We use our own .lib file to support VS2005 whose dbghelp.lib doesn't have some
-# routines we want to use.
 if (WIN32)
-  # XXX: if we add any more of these .lib files we should share this code
-  # (currently we have make/ntdll_imports.cmake and here).
-  find_program(LIB_EXECUTABLE lib.exe DOC "path to lib.exe")
-  if (NOT LIB_EXECUTABLE)
-    message(FATAL_ERROR "Cannot find lib.exe")
-  endif (NOT LIB_EXECUTABLE)
-  set(dbghelp_src "${CMAKE_CURRENT_SOURCE_DIR}/dbghelp_imports.c")
-  set(dbghelp_def "${CMAKE_CURRENT_SOURCE_DIR}/dbghelp_imports.def")
-  # We need a different name so we can also use the VS dbghelp.lib
-  set(dbghelp_lib "${CMAKE_CURRENT_BINARY_DIR}/dbghelp_imports.lib")
-  set_property(SOURCE "${dbghelp_lib}" PROPERTY GENERATED true)
-  # Because the exports are stdcall we can't just use a .def file: we need
-  # an .obj file built from stubs w/ the same signatures.
-  # We don't need a stamp file b/c the .lib is not a source; plus a stamp
-  # file causes Ninja to fail to build.
-  add_custom_command(OUTPUT "${dbghelp_lib}"
-    DEPENDS "${dbghelp_src}" "${dbghelp_def}"
-    COMMAND "${CMAKE_C_COMPILER}" ARGS /nologo /c /Ob0 ${dbghelp_src}
-    COMMAND "${LIB_EXECUTABLE}" ARGS
-      /nologo /name:dbghelp.dll /def:${dbghelp_def}
-      ${CMAKE_CURRENT_BINARY_DIR}/dbghelp_imports.obj
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    VERBATIM # recommended: p260 of cmake book
-    )
-  if ("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
-    set(dbghelp_dep "")
-    # for correct parallel builds we need a target to avoid
-    # duplicate and racy VS per-project rules
-    add_custom_target(dbghelp_tgt DEPENDS "${dbghelp_lib}")
-  else ()
-    set(dbghelp_dep "${dbghelp_lib}")
-  endif ()
-  set(dbghelp_flags "${dbghelp_lib}")
+  if (MSVC)
+    # We use our own .lib file to support VS2005 whose dbghelp.lib doesn't
+    # have some routines we want to use.
+
+    # XXX: if we add any more of these .lib files we should share this code
+    # (currently we have make/ntdll_imports.cmake and here).
+    find_program(LIB_EXECUTABLE lib.exe DOC "path to lib.exe")
+    if (NOT LIB_EXECUTABLE)
+      message(FATAL_ERROR "Cannot find lib.exe")
+    endif (NOT LIB_EXECUTABLE)
+    set(dbghelp_src "${CMAKE_CURRENT_SOURCE_DIR}/dbghelp_imports.c")
+    set(dbghelp_def "${CMAKE_CURRENT_SOURCE_DIR}/dbghelp_imports.def")
+    # We need a different name so we can also use the VS dbghelp.lib
+    set(dbghelp_lib "${CMAKE_CURRENT_BINARY_DIR}/dbghelp_imports.lib")
+    set_property(SOURCE "${dbghelp_lib}" PROPERTY GENERATED true)
+    # Because the exports are stdcall we can't just use a .def file: we need
+    # an .obj file built from stubs w/ the same signatures.
+    # We don't need a stamp file b/c the .lib is not a source; plus a stamp
+    # file causes Ninja to fail to build.
+    add_custom_command(OUTPUT "${dbghelp_lib}"
+      DEPENDS "${dbghelp_src}" "${dbghelp_def}"
+      COMMAND "${CMAKE_C_COMPILER}" ARGS /nologo /c /Ob0 ${dbghelp_src}
+      COMMAND "${LIB_EXECUTABLE}" ARGS
+        /nologo /name:dbghelp.dll /def:${dbghelp_def}
+        ${CMAKE_CURRENT_BINARY_DIR}/dbghelp_imports.obj
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      VERBATIM # recommended: p260 of cmake book
+      )
+    if ("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
+      set(dbghelp_dep "")
+      # for correct parallel builds we need a target to avoid
+      # duplicate and racy VS per-project rules
+      add_custom_target(dbghelp_tgt DEPENDS "${dbghelp_lib}")
+    else ()
+      set(dbghelp_dep "${dbghelp_lib}")
+    endif ()
+    set(dbghelp_flags "${dbghelp_lib}")
+  endif(MSVC)
 
   set(srcs
     drsyms_windows.c drsyms_unix_common.c drsyms_pecoff.c

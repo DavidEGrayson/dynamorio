@@ -517,11 +517,6 @@ if (UNIX)
 
 else (UNIX)
 
-  if (NOT ${COMPILER_BASE_NAME} STREQUAL "cl")
-    # we use cl pragmas and intrinsics
-    message(FATAL_ERROR "cl (Microsoft C++ compiler) is required to build")
-  endif (NOT ${COMPILER_BASE_NAME} STREQUAL "cl")
-
   # CMake older than 2.6.3 does not automatically look for ml or ml64
   if ("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
     # CMAKE_C_COMPILER doesn't have full path, unless user has in PATH
@@ -557,7 +552,7 @@ else (UNIX)
       set(sdk_bindir "${sdk_dir}/bin")
     endif (X64)
   endif ()
-  find_program(CMAKE_MC_COMPILER mc.exe HINTS "${sdk_bindir}"
+  find_program(CMAKE_MC_COMPILER NAME mc.exe windmc.exe HINTS "${sdk_bindir}"
     DOC "path to message compiler")
   if (NOT CMAKE_MC_COMPILER)
     message(FATAL_ERROR "message compiler not found: required to build")
@@ -712,77 +707,80 @@ if (UNIX)
   if (NOT CMAKE_COMPILER_IS_CLANG)
     set(DBG_OPT "${DBG_OPT} -fno-builtin-strcmp")
   endif ()
-else (UNIX)
-  # FIXME: why isn't ${CMAKE_CL_NOLOGO} set?
-  set(BASE_CFLAGS "/nologo")
-  # build in parallel, always.
-  # note that /MP is not officially supported on VS 2005 and others
-  # have seen occasional problems: we'll risk it.  we could check for
-  # "MSVC10 OR MSVC90".
-  set(BASE_CFLAGS "${BASE_CFLAGS} /MP")
-  # read-only string pooling
-  set(BASE_CFLAGS "${BASE_CFLAGS} /GF")
-  if (NOT CMAKE_C_COMPILER_VERSION VERSION_LESS 18.0)
-    # i#1376: VS2013 requires /FS w/ multiple cl.exe in parallel (which Ninja
-    # uses).  While /MP is supposed to enable it, it doesn't seem to.
-    # This is recommended after /Fd but it seems to work here.
-    set(BASE_CFLAGS "${BASE_CFLAGS} /FS")
-  endif()
-  # FIXME case 191729: we should try to enable this.
-  # Currently we get "unresolved external symbol ___security_cookie"
-  set(BASE_CFLAGS "${BASE_CFLAGS} /GS-")
-  # VS2010 has /MD as the default (and does declspec(dllimport) for
-  # libc routines) so make sure we explicitly request /MT
-  set(BASE_CFLAGS "${BASE_CFLAGS} /MT")
-  set(WARN "/W4 /WX")
-  # Default from cmake has /W3 so remove to avoid warning about overriding
-  string(REGEX REPLACE "/W[0-9]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-  string(REGEX REPLACE "/W[0-9]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  if (GENERATE_PDBS)
-    set(DBG "/Zi")
-    set(LINK_DBG "/debug")
-  else (GENERATE_PDBS)
-    # xref PR 192750 - runregression uses this to avoid over-ssh pdb issues
-    set(DBG "")
-    set(LINK_DBG "")
-    # Default from cmake in DEBUG and RELWITHDEBINFO has /debug
-    string(REGEX REPLACE "/debug" "" CMAKE_EXE_LINKER_FLAGS
-      "${CMAKE_EXE_LINKER_FLAGS}")
-    string(REGEX REPLACE "/debug" "" CMAKE_MODULE_LINKER_FLAGS
-      "${CMAKE_MODULE_LINKER_FLAGS}")
-    string(REGEX REPLACE "/debug" "" CMAKE_SHARED_LINKER_FLAGS
-      "${CMAKE_SHARED_LINKER_FLAGS}")
-  endif (GENERATE_PDBS)
+elsif (WIN32)
+  if (MSVC)
+    # FIXME: why isn't ${CMAKE_CL_NOLOGO} set?
+    set(BASE_CFLAGS "/nologo")
+    # build in parallel, always.
+    # note that /MP is not officially supported on VS 2005 and others
+    # have seen occasional problems: we'll risk it.  we could check for
+    # "MSVC10 OR MSVC90".
+    set(BASE_CFLAGS "${BASE_CFLAGS} /MP")
+    # read-only string pooling
+    set(BASE_CFLAGS "${BASE_CFLAGS} /GF")
+    if (NOT CMAKE_C_COMPILER_VERSION VERSION_LESS 18.0)
+      # i#1376: VS2013 requires /FS w/ multiple cl.exe in parallel (which Ninja
+      # uses).  While /MP is supposed to enable it, it doesn't seem to.
+      # This is recommended after /Fd but it seems to work here.
+      set(BASE_CFLAGS "${BASE_CFLAGS} /FS")
+    endif()
+    # FIXME case 191729: we should try to enable this.
+    # Currently we get "unresolved external symbol ___security_cookie"
+    set(BASE_CFLAGS "${BASE_CFLAGS} /GS-")
+    # VS2010 has /MD as the default (and does declspec(dllimport) for
+    # libc routines) so make sure we explicitly request /MT
+    set(BASE_CFLAGS "${BASE_CFLAGS} /MT")
+    set(WARN "/W4 /WX")
+    # Default from cmake has /W3 so remove to avoid warning about overriding
+    string(REGEX REPLACE "/W[0-9]" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+    string(REGEX REPLACE "/W[0-9]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    if (GENERATE_PDBS)
+      set(DBG "/Zi")
+      set(LINK_DBG "/debug")
+    else (GENERATE_PDBS)
+      # xref PR 192750 - runregression uses this to avoid over-ssh pdb issues
+      set(DBG "")
+      set(LINK_DBG "")
+      # Default from cmake in DEBUG and RELWITHDEBINFO has /debug
+      string(REGEX REPLACE "/debug" "" CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS}")
+      string(REGEX REPLACE "/debug" "" CMAKE_MODULE_LINKER_FLAGS
+        "${CMAKE_MODULE_LINKER_FLAGS}")
+      string(REGEX REPLACE "/debug" "" CMAKE_SHARED_LINKER_FLAGS
+        "${CMAKE_SHARED_LINKER_FLAGS}")
+    endif (GENERATE_PDBS)
 
-  # i#1424: target the oldest possible platform we can
-  if (X64)
-    set(os_target "5.02") # Win2003x64/WinXPx64
-  else (X64)
-    if (CMAKE_C_COMPILER_VERSION VERSION_LESS 17.0) # up to and including VS2010
-      set(os_target "5.00") # Win2K
-    else () # VS2012, VS2013
-      set(os_target "5.01") # WinXP
+    # i#1424: target the oldest possible platform we can
+    if (X64)
+      set(os_target "5.02") # Win2003x64/WinXPx64
+    else (X64)
+      if (CMAKE_C_COMPILER_VERSION VERSION_LESS 17.0) # up to and including VS2010
+        set(os_target "5.00") # Win2K
+      else () # VS2012, VS2013
+        set(os_target "5.01") # WinXP
+      endif ()
+    endif (X64)
+    foreach (lflags CMAKE_EXE_LINKER_FLAGS
+        CMAKE_MODULE_LINKER_FLAGS
+        CMAKE_SHARED_LINKER_FLAGS)
+      set(${lflags} "${${lflags}} /subsystem:console,${os_target}")
+    endforeach()
+    message(STATUS "Targeting subsystem ${os_target}")
+
+    # w/ cl, using DBG here won't mess up the optimizations, debug line number info
+    # gets a little messed up, but is better than nothing
+    set(OPT "/O2 ${DBG}")
+    # do not use /O2 on windows, it messes up debug info!
+    # explicitly request /Od even though it's cl's default b/c VS has /O2 as default
+    # and cl 14.00 hangs compiling core/fragment.c with /Od and DEBUG.
+    set(DBG_OPT "/Od")
+    set(BASE_CXXFLAGS "${BASE_CFLAGS}")
+    if (CMAKE_RC_FLAGS)
+      set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /nologo")
+    else ()
+      set(CMAKE_RC_FLAGS "/nologo")
     endif ()
-  endif (X64)
-  foreach (lflags CMAKE_EXE_LINKER_FLAGS
-      CMAKE_MODULE_LINKER_FLAGS
-      CMAKE_SHARED_LINKER_FLAGS)
-    set(${lflags} "${${lflags}} /subsystem:console,${os_target}")
-  endforeach()
-  message(STATUS "Targeting subsystem ${os_target}")
-
-  # w/ cl, using DBG here won't mess up the optimizations, debug line number info
-  # gets a little messed up, but is better than nothing
-  set(OPT "/O2 ${DBG}")
-  # do not use /O2 on windows, it messes up debug info!
-  # explicitly request /Od even though it's cl's default b/c VS has /O2 as default
-  # and cl 14.00 hangs compiling core/fragment.c with /Od and DEBUG.
-  set(DBG_OPT "/Od")
-  set(BASE_CXXFLAGS "${BASE_CFLAGS}")
-  if (CMAKE_RC_FLAGS)
-    set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /nologo")
-  else ()
-    set(CMAKE_RC_FLAGS "/nologo")
+  elseif (CMAKE_COMPILER_IS_GNUCC)
   endif ()
 endif (UNIX)
 

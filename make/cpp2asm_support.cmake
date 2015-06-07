@@ -142,14 +142,16 @@ if (UNIX)
   set(CPP_NO_LINENUM -P)
   set(CPP_KEEP_WHITESPACE -traditional-cpp)
   set(CMAKE_CPP_FLAGS "")
-else (UNIX)
+elseif (WIN32)
   set(CMAKE_CPP ${CMAKE_C_COMPILER})
-
-  set(CPP_KEEP_COMMENTS /C)
-  set(CPP_NO_LINENUM /EP)
-  set(CPP_KEEP_WHITESPACE "")
-  set(CMAKE_CPP_FLAGS "/nologo")
+  if (MSVC)
+    set(CPP_KEEP_COMMENTS /C)
+    set(CPP_NO_LINENUM /EP)
+    set(CPP_KEEP_WHITESPACE "")
+    set(CMAKE_CPP_FLAGS "/nologo")
+  endif (MSVC)
 endif (UNIX)
+
 
 ##################################################
 # Assembler location and flags
